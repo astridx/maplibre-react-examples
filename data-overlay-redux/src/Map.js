@@ -1,0 +1,106 @@
+import React, { useRef, useEffect, useState } from 'react';
+import maplibregl from 'maplibre-gl';
+import "maplibre-gl/dist/maplibre-gl.css"
+import Legend from './components/Legend';
+import Optionsfield from './components/Optionsfield';
+import './Map.css';
+import { setActiveOption } from './redux/action-creators';
+import { connect } from 'react-redux';
+
+const ConnectedLegend = connect(mapStateToPropsLegend)(Legend);
+const ConnectedOptionsfield = connect(mapStateToPropsOptionsfield)(
+  Optionsfield
+);
+
+function mapStateToPropsLegend(state) {
+  return {
+    active: state.active
+  };
+}
+
+function mapStateToPropsOptionsfield(state) {
+  return {
+    options: state.options,
+    active: state.active
+  };
+}
+
+const Map = props => {
+  const mapContainerRef = useRef(null);
+  const [map, setMap] = useState(null);
+
+  // Initialize map when component mounts
+  useEffect(() => {
+    const map = new maplibregl.Map({
+      container: mapContainerRef.current,
+      style: 'https://demotiles.maplibre.org/style.json',
+      center: [5, 34],
+      zoom: 1.5
+    });
+
+    map.on('load', () => {
+      map.addSource('countries', {
+        type: 'geojson',
+        data: props.data
+      });
+
+      map.setLayoutProperty('countries-label', 'text-field', [
+        'format',
+        ['get', 'name_en'],
+        { 'font-scale': 1.2 },
+        '\n',
+        {},
+        ['get', 'name'],
+        {
+          'font-scale': 0.8,
+          'text-font': [
+            'literal',
+            ['DIN Offc Pro Italic', 'Arial Unicode MS Regular']
+          ]
+        }
+      ]);
+
+      map.addLayer(
+        {
+          id: 'countries',
+          type: 'fill',
+          source: 'countries'
+        },
+        'countries-label'
+      );
+
+      map.setPaintProperty('countries', 'fill-color', {
+        property: props.active.property,
+        stops: props.active.stops
+      });
+
+      setMap(map);
+    });
+
+    // Clean up on unmount
+    return () => map.remove();
+  }, []);
+
+  useEffect(() => {
+    paint();
+  }, [props.active]);
+
+  const paint = () => {
+    if (map) {
+      map.setPaintProperty('countries', 'fill-color', {
+        property: props.active.property,
+        stops: props.active.stops
+      });
+    }
+  };
+
+  return (
+    <div>
+      <div ref={mapContainerRef} className='map-container' />
+      <ConnectedLegend />
+      <ConnectedOptionsfield changeState={setActiveOption} />
+    </div>
+  );
+};
+
+export default Map;
